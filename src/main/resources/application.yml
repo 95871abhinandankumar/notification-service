@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: notification-service
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/notification-service
+  redis:
+    host: localhost
+    port: 6379
+
+server:
+  port: 8080
+
+aws:
+  ses:
+    access-key: ${AWS_ACCESS_KEY:}
+    secret-key: ${AWS_SECRET_KEY:}
+    region: ${AWS_REGION:us-east-1}
+
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+
+firebase:
+  config-path: ${FIREBASE_CONFIG_PATH:}
+
+notification:
+  email:
+    from: ${EMAIL_FROM:noreply@example.com}
+  retry:
+    max-attempts: 3
+    initial-delay: 1000
+    multiplier: 2 
