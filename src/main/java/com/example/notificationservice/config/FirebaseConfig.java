@@ -12,7 +12,7 @@ import java.io.IOException;
 @Configuration
 public class FirebaseConfig {
 
-    @Value("${firebase.config-path}")
+    @Value("${firebase.service-account-path}")
     private String firebaseConfigPath;
 
     @PostConstruct

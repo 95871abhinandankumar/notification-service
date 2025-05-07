@@ -1,37 +1,70 @@
 package com.example.notificationservice.model;
 
+import jakarta.persistence.*;
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-
 import java.time.LocalDateTime;
-import java.util.Map;
 
 @Data
-@Document(collection = "notification_history")
+@Entity
+@Table(name = "notification_history")
 public class NotificationHistory {
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false)
     private String userId;
-    private String templateId;
+
+    @Column(name = "campaign_id")
+    private String campaignId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
     private NotificationType type;
-    private String recipient;  // email, phone number, or device token
+
+    @Column(name = "recipient", nullable = false)
+    private String recipient;
+
+    @Column(name = "subject")
     private String subject;
+
+    @Column(name = "content", columnDefinition = "TEXT")
     private String content;
-    private Map<String, Object> variables;
-    private NotificationStatus status;
+
+    @Column(name = "variables", columnDefinition = "TEXT")
+    private String variables;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private NotificationStatus status = NotificationStatus.PENDING;
+
+    @Column(name = "delivery_time")
+    private LocalDateTime deliveryTime;
+
+    @Column(name = "error_message")
     private String errorMessage;
-    private LocalDateTime sentAt;
-    private LocalDateTime deliveredAt;
-    private String providerResponse;  // Response from email/SMS/push provider
-    private int retryCount;
-    private String campaignId;  // For batch notifications
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
     public enum NotificationStatus {
         PENDING,
         SENT,
         DELIVERED,
-        FAILED,
-        RETRYING
+        FAILED
     }
-} 
+}

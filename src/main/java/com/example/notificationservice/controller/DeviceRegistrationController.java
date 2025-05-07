@@ -38,12 +38,13 @@ public class DeviceRegistrationController {
     })
     @PostMapping
     public ResponseEntity<NotificationResponse> registerDevice(
-            @Parameter(description = "User ID", required = true) @PathVariable String userId,
+            @Parameter(description = "User ID", required = true) @PathVariable Long userId,
             @Parameter(description = "Device registration details", required = true) 
             @Valid @RequestBody DeviceRegistration device) {
         try {
             logger.info("Registering new device for user {}: platform={}", userId, device.getPlatform());
-            device.setUserId(userId);
+            device.setUser(userService.getUserById(userId)
+                .orElseThrow(() -> new NotificationException("User not found")));
             
             NotificationPreference preference = new NotificationPreference();
             preference.setType(NotificationType.PUSH);
@@ -68,14 +69,15 @@ public class DeviceRegistrationController {
     })
     @PutMapping("/{deviceId}")
     public ResponseEntity<NotificationResponse> updateDevice(
-            @Parameter(description = "User ID", required = true) @PathVariable String userId,
-            @Parameter(description = "Device ID", required = true) @PathVariable String deviceId,
+            @Parameter(description = "User ID", required = true) @PathVariable Long userId,
+            @Parameter(description = "Device ID", required = true) @PathVariable Long deviceId,
             @Parameter(description = "Updated device details", required = true) 
             @Valid @RequestBody DeviceRegistration device) {
         try {
             logger.info("Updating device {} for user {}: platform={}", deviceId, userId, device.getPlatform());
             device.setId(deviceId);
-            device.setUserId(userId);
+            device.setUser(userService.getUserById(userId)
+                .orElseThrow(() -> new NotificationException("User not found")));
             
             NotificationPreference preference = new NotificationPreference();
             preference.setType(NotificationType.PUSH);
@@ -99,8 +101,8 @@ public class DeviceRegistrationController {
     })
     @DeleteMapping("/{deviceId}")
     public ResponseEntity<NotificationResponse> deregisterDevice(
-            @Parameter(description = "User ID", required = true) @PathVariable String userId,
-            @Parameter(description = "Device ID", required = true) @PathVariable String deviceId) {
+            @Parameter(description = "User ID", required = true) @PathVariable Long userId,
+            @Parameter(description = "Device ID", required = true) @PathVariable Long deviceId) {
         try {
             logger.info("Deregistering device {} for user {}", deviceId, userId);
             userService.removeNotificationPreference(userId, NotificationType.PUSH);

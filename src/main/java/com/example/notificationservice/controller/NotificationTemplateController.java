@@ -59,7 +59,7 @@ public class NotificationTemplateController {
     @GetMapping("/{id}")
     public ResponseEntity<NotificationTemplate> getTemplateById(
             @Parameter(description = "Template ID", required = true) 
-            @PathVariable String id) {
+            @PathVariable Long id) {
         try {
             logger.info("Fetching template with ID: {}", id);
             return notificationService.getTemplateById(id)
@@ -100,7 +100,7 @@ public class NotificationTemplateController {
     @PutMapping("/{id}")
     public ResponseEntity<NotificationTemplate> updateTemplate(
             @Parameter(description = "Template ID", required = true) 
-            @PathVariable String id,
+            @PathVariable Long id,
             @Parameter(description = "Updated template details", required = true) 
             @Valid @RequestBody NotificationTemplate template) {
         try {
@@ -123,7 +123,7 @@ public class NotificationTemplateController {
     @DeleteMapping("/{id}")
     public ResponseEntity<NotificationResponse> deleteTemplate(
             @Parameter(description = "Template ID", required = true) 
-            @PathVariable String id) {
+            @PathVariable Long id) {
         try {
             logger.info("Deleting template with ID: {}", id);
             notificationService.deleteTemplate(id);

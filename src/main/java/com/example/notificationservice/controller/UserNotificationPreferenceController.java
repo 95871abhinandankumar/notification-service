@@ -37,7 +37,7 @@ public class UserNotificationPreferenceController {
     })
     @PutMapping("/{type}")
     public ResponseEntity<NotificationResponse> updateNotificationPreference(
-            @Parameter(description = "User ID", required = true) @PathVariable String userId,
+            @Parameter(description = "User ID", required = true) @PathVariable Long userId,
             @Parameter(description = "Notification type", required = true) @PathVariable NotificationType type,
             @Parameter(description = "Whether to enable the notification", required = true) @RequestParam boolean enabled,
             @Parameter(description = "Device token for push notifications") @RequestParam(required = false) String deviceToken) {
@@ -61,7 +61,7 @@ public class UserNotificationPreferenceController {
     })
     @PostMapping
     public ResponseEntity<NotificationResponse> addNotificationPreference(
-            @Parameter(description = "User ID", required = true) @PathVariable String userId,
+            @Parameter(description = "User ID", required = true) @PathVariable Long userId,
             @Parameter(description = "Notification preference details", required = true) 
             @Valid @RequestBody NotificationPreference preference) {
         try {
@@ -83,7 +83,7 @@ public class UserNotificationPreferenceController {
     })
     @DeleteMapping("/{type}")
     public ResponseEntity<NotificationResponse> removeNotificationPreference(
-            @Parameter(description = "User ID", required = true) @PathVariable String userId,
+            @Parameter(description = "User ID", required = true) @PathVariable Long userId,
             @Parameter(description = "Notification type to remove", required = true) @PathVariable NotificationType type) {
         try {
             logger.info("Removing notification preference for user {}: type={}", userId, type);

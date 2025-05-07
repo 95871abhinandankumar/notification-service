@@ -1,8 +1,8 @@
 package com.example.notificationservice.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Data
 @NoArgsConstructor
@@ -10,4 +10,4 @@ import lombok.NoArgsConstructor;
 public class NotificationResponse {
     private boolean success;
     private String message;
-} 
+}

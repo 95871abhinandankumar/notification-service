@@ -7,15 +7,14 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserService {
-    User createUser(User user);
-    User updateUser(String userId, User user);
-    Optional<User> getUserById(String id);
+    Optional<User> getUserById(Long id);
     Optional<User> getUserByEmail(String email);
     Optional<User> getUserByPhoneNumber(String phoneNumber);
-    List<User> getUsersByNotificationType(NotificationType type);
-    User updateNotificationPreference(String userId, NotificationType type, boolean enabled, String deviceToken);
-    void deleteUser(String id);
+    User createUser(User user);
+    User updateUser(Long userId, User user);
+    void deleteUser(Long id);
     List<User> getAllUsers();
-    void updateNotificationPreference(String userId, NotificationPreference preference);
-    void removeNotificationPreference(String userId, NotificationType type);
+    void updateNotificationPreference(Long userId, NotificationPreference preference);
+    void updateNotificationPreference(Long userId, NotificationType type, boolean enabled, String deviceToken);
+    void removeNotificationPreference(Long userId, NotificationType type);
 } 

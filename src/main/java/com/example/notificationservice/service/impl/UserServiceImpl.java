@@ -25,8 +25,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Optional<User> getUserById(String userId) {
-        return userRepository.findById(userId);
+    public Optional<User> getUserById(Long id) {
+        try {
+            return userRepository.findById(id);
+        } catch (Exception e) {
+            logger.error("Failed to get user by id: {}", e.getMessage(), e);
+            throw new NotificationException("Failed to get user", e);
+        }
     }
 
     @Override
@@ -40,29 +45,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> getUsersByNotificationType(NotificationType type) {
-        return userRepository.findByNotificationPreferencesTypeAndNotificationPreferencesEnabledTrue(type);
-    }
-
-    @Override
-    public User updateNotificationPreference(String userId, NotificationType type, boolean enabled, String deviceToken) {
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new NotificationException("User not found: " + userId));
-        
-        user.getNotificationPreferences().stream()
-            .filter(pref -> pref.getType() == type)
-            .findFirst()
-            .ifPresent(pref -> {
-                pref.setEnabled(enabled);
-                if (deviceToken != null) {
-                    pref.setDeviceToken(deviceToken);
-                }
-            });
-        
-        return userRepository.save(user);
-    }
-
-    @Override
     public User createUser(User user) {
         try {
             return userRepository.save(user);
@@ -73,20 +55,30 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User updateUser(String userId, User user) {
-        if (!userRepository.existsById(userId)) {
-            throw new NotificationException("User not found: " + userId);
+    public User updateUser(Long userId, User user) {
+        try {
+            if (!userRepository.existsById(userId)) {
+                throw new NotificationException("User not found: " + userId);
+            }
+            user.setId(userId);
+            return userRepository.save(user);
+        } catch (Exception e) {
+            logger.error("Failed to update user: {}", e.getMessage(), e);
+            throw new NotificationException("Failed to update user", e);
         }
-        user.setId(userId);
-        return userRepository.save(user);
     }
 
     @Override
-    public void deleteUser(String userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new NotificationException("User not found: " + userId);
+    public void deleteUser(Long id) {
+        try {
+            if (!userRepository.existsById(id)) {
+                throw new NotificationException("User not found: " + id);
+            }
+            userRepository.deleteById(id);
+        } catch (Exception e) {
+            logger.error("Failed to delete user: {}", e.getMessage(), e);
+            throw new NotificationException("Failed to delete user", e);
         }
-        userRepository.deleteById(userId);
     }
 
     @Override
@@ -95,22 +87,54 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updateNotificationPreference(String userId, NotificationPreference preference) {
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new NotificationException("User not found: " + userId));
-        
-        user.getNotificationPreferences().removeIf(p -> p.getType() == preference.getType());
-        user.getNotificationPreferences().add(preference);
-        
-        userRepository.save(user);
+    public void updateNotificationPreference(Long userId, NotificationPreference preference) {
+        try {
+            User user = getUserById(userId)
+                .orElseThrow(() -> new NotificationException("User not found"));
+            
+            preference.setUser(user);
+            user.getNotificationPreferences().add(preference);
+            userRepository.save(user);
+        } catch (Exception e) {
+            logger.error("Failed to update notification preference: {}", e.getMessage(), e);
+            throw new NotificationException("Failed to update notification preference", e);
+        }
     }
 
     @Override
-    public void removeNotificationPreference(String userId, NotificationType type) {
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new NotificationException("User not found: " + userId));
-        
-        user.getNotificationPreferences().removeIf(p -> p.getType() == type);
-        userRepository.save(user);
+    public void updateNotificationPreference(Long userId, NotificationType type, boolean enabled, String deviceToken) {
+        try {
+            User user = getUserById(userId)
+                .orElseThrow(() -> new NotificationException("User not found"));
+            
+            user.getNotificationPreferences().stream()
+                .filter(pref -> pref.getType() == type)
+                .findFirst()
+                .ifPresent(pref -> {
+                    pref.setEnabled(enabled);
+                    if (deviceToken != null) {
+                        pref.setDeviceToken(deviceToken);
+                    }
+                });
+            
+            userRepository.save(user);
+        } catch (Exception e) {
+            logger.error("Failed to update notification preference: {}", e.getMessage(), e);
+            throw new NotificationException("Failed to update notification preference", e);
+        }
+    }
+
+    @Override
+    public void removeNotificationPreference(Long userId, NotificationType type) {
+        try {
+            User user = getUserById(userId)
+                .orElseThrow(() -> new NotificationException("User not found"));
+            
+            user.getNotificationPreferences().removeIf(pref -> pref.getType() == type);
+            userRepository.save(user);
+        } catch (Exception e) {
+            logger.error("Failed to remove notification preference: {}", e.getMessage(), e);
+            throw new NotificationException("Failed to remove notification preference", e);
+        }
     }
 } 

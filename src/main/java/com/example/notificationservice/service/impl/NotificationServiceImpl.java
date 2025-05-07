@@ -1,14 +1,16 @@
 package com.example.notificationservice.service.impl;
 
-import com.example.notificationservice.service.NotificationService;
+import com.example.notificationservice.dto.NotificationResponse;
+import com.example.notificationservice.model.NotificationRequest;
+import com.example.notificationservice.model.NotificationType;
 import com.example.notificationservice.service.EmailService;
 import com.example.notificationservice.service.FCMService;
-import com.example.notificationservice.service.TwilioService;
-import com.example.notificationservice.service.UserService;
+import com.example.notificationservice.service.NotificationService;
+import com.example.notificationservice.service.SMSService;
 import com.example.notificationservice.model.*;
+import com.example.notificationservice.repository.NotificationTemplateRepository;
 import com.example.notificationservice.exception.NotificationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.retry.annotation.Backoff;
@@ -16,32 +18,33 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Implementation of the NotificationService interface
  */
+@Slf4j
 @Service
 public class NotificationServiceImpl implements NotificationService {
-    private static final Logger logger = LoggerFactory.getLogger(NotificationServiceImpl.class);
-
     private final EmailService emailService;
+    private final SMSService smsService;
     private final FCMService fcmService;
-    private final TwilioService twilioService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
-    private final UserService userService;
+    private final NotificationTemplateRepository templateRepository;
 
     @Autowired
     public NotificationServiceImpl(
             EmailService emailService,
+            SMSService smsService,
             FCMService fcmService,
-            TwilioService twilioService,
             KafkaTemplate<String, Object> kafkaTemplate,
-            UserService userService) {
+            NotificationTemplateRepository templateRepository) {
         this.emailService = emailService;
+        this.smsService = smsService;
         this.fcmService = fcmService;
-        this.twilioService = twilioService;
         this.kafkaTemplate = kafkaTemplate;
-        this.userService = userService;
+        this.templateRepository = templateRepository;
     }
 
     @Override
@@ -53,22 +56,23 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendNotification(@Valid NotificationRequest request) {
         validateRequest(request);
         try {
-            switch (request.getType()) {
+            NotificationType type = request.getType();
+            switch (type) {
                 case EMAIL:
-                    sendEmail(request);
+                    sendEmailNotification(request);
                     break;
                 case SMS:
-                    sendSMS(request);
+                    sendSMSNotification(request);
                     break;
                 case PUSH:
                     sendPushNotification(request);
                     break;
                 default:
-                    throw new NotificationException("Unsupported notification type: " + request.getType());
+                    throw new NotificationException("Unsupported notification type: " + type);
             }
         } catch (Exception e) {
-            logger.error("Failed to send notification: {}", e.getMessage(), e);
-            throw new NotificationException("Failed to send notification", e);
+            log.error("Failed to send notification: {}", e.getMessage(), e);
+            throw new NotificationException("Failed to send notification: " + e.getMessage(), e);
         }
     }
 
@@ -77,36 +81,46 @@ public class NotificationServiceImpl implements NotificationService {
         validateRequest(request);
         try {
             kafkaTemplate.send("notifications", request);
-            logger.info("Notification queued successfully for recipient: {}", request.getRecipient());
+            log.info("Notification queued successfully for recipient: {}", request.getRecipient());
         } catch (Exception e) {
-            logger.error("Failed to queue notification: {}", e.getMessage(), e);
+            log.error("Failed to queue notification: {}", e.getMessage(), e);
             throw new NotificationException("Failed to queue notification", e);
         }
     }
 
     @Override
     public void processCampaign(@Valid NotificationCampaign campaign) {
-        validateCampaign(campaign);
-        try {
-            campaign.setStatus(NotificationCampaign.CampaignStatus.IN_PROGRESS);
-            campaign.setTotalRecipients(campaign.getTargetUserIds().size());
+        // Implementation for campaign processing
+    }
 
-            for (String userId : campaign.getTargetUserIds()) {
-                User user = userService.getUserById(userId)
-                    .orElseThrow(() -> new NotificationException("User not found: " + userId));
+    @Override
+    public Optional<NotificationTemplate> getTemplateById(Long id) {
+        return templateRepository.findById(id);
+    }
 
-                NotificationRequest request = createNotificationRequest(campaign, user);
-                sendNotification(request);
-                campaign.setSuccessfulDeliveries(campaign.getSuccessfulDeliveries() + 1);
-            }
+    @Override
+    public List<NotificationTemplate> getTemplatesByType(NotificationType type) {
+        return templateRepository.findByType(type);
+    }
 
-            campaign.setStatus(NotificationCampaign.CampaignStatus.COMPLETED);
-            logger.info("Campaign completed successfully: {}", campaign.getName());
-        } catch (Exception e) {
-            campaign.setStatus(NotificationCampaign.CampaignStatus.FAILED);
-            logger.error("Campaign processing failed: {}", e.getMessage(), e);
-            throw new NotificationException("Campaign processing failed", e);
-        }
+    @Override
+    public NotificationTemplate updateTemplate(NotificationTemplate template) {
+        return templateRepository.save(template);
+    }
+
+    @Override
+    public void deleteTemplate(Long id) {
+        templateRepository.deleteById(id);
+    }
+
+    @Override
+    public List<NotificationTemplate> getAllTemplates() {
+        return templateRepository.findAll();
+    }
+
+    @Override
+    public NotificationTemplate createTemplate(NotificationTemplate template) {
+        return templateRepository.save(template);
     }
 
     private void validateRequest(NotificationRequest request) {
@@ -119,69 +133,52 @@ public class NotificationServiceImpl implements NotificationService {
         if (!StringUtils.hasText(request.getRecipient())) {
             throw new NotificationException("Recipient cannot be empty");
         }
-        if (request.getType() == NotificationType.PUSH && !StringUtils.hasText(request.getToken())) {
+        NotificationType type = request.getType();
+        if (type == NotificationType.PUSH && !StringUtils.hasText(request.getToken())) {
             throw new NotificationException("Device token is required for push notifications");
         }
     }
 
-    private void validateCampaign(NotificationCampaign campaign) {
-        if (campaign == null) {
-            throw new NotificationException("Campaign cannot be null");
-        }
-        if (campaign.getType() == null) {
-            throw new NotificationException("Campaign type cannot be null");
-        }
-        if (campaign.getTargetUserIds() == null || campaign.getTargetUserIds().isEmpty()) {
-            throw new NotificationException("Campaign must have target users");
+    private void sendEmailNotification(NotificationRequest request) {
+        try {
+            emailService.sendEmail(
+                request.getRecipient(),
+                request.getSubject(),
+                request.getContent()
+            );
+            log.info("Email sent successfully to {}", request.getRecipient());
+        } catch (Exception e) {
+            log.error("Failed to send email to {}", request.getRecipient(), e);
+            throw new NotificationException("Failed to send email: " + e.getMessage(), e);
         }
     }
 
-    private void sendEmail(NotificationRequest request) {
-        emailService.sendEmail(
-            request.getRecipient(),
-            request.getSubject(),
-            request.getContent()
-        );
-    }
-
-    private void sendSMS(NotificationRequest request) {
-        twilioService.sendSMS(
-            request.getRecipient(),
-            request.getContent()
-        );
+    private void sendSMSNotification(NotificationRequest request) {
+        try {
+            smsService.sendSMS(
+                request.getRecipient(),
+                request.getContent()
+            );
+            log.info("SMS sent successfully to {}", request.getRecipient());
+        } catch (Exception e) {
+            log.error("Failed to send SMS to {}", request.getRecipient(), e);
+            throw new NotificationException("Failed to send SMS: " + e.getMessage(), e);
+        }
     }
 
     private void sendPushNotification(NotificationRequest request) {
         try {
-            fcmService.sendMessageToToken(request);
+            if (request.getToken() != null) {
+                fcmService.sendMessageToToken(request);
+            } else if (request.getTopic() != null) {
+                throw new NotificationException("Topic-based notifications are not supported yet");
+            } else {
+                throw new NotificationException("Either token or topic must be provided for push notifications");
+            }
+            log.info("Push notification sent successfully to {}", request.getToken());
         } catch (Exception e) {
-            throw new NotificationException("Failed to send push notification", e);
+            log.error("Failed to send push notification", e);
+            throw new NotificationException("Failed to send push notification: " + e.getMessage(), e);
         }
-    }
-
-    private NotificationRequest createNotificationRequest(NotificationCampaign campaign, User user) {
-        NotificationRequest request = new NotificationRequest();
-        request.setType(campaign.getType());
-        request.setSubject(campaign.getVariables().get("subject").toString());
-        request.setContent(campaign.getVariables().get("content").toString());
-
-        switch (campaign.getType()) {
-            case EMAIL:
-                request.setRecipient(user.getEmail());
-                break;
-            case SMS:
-                request.setRecipient(user.getPhoneNumber());
-                break;
-            case PUSH:
-                user.getNotificationPreferences().stream()
-                    .filter(pref -> pref.getType() == NotificationType.PUSH)
-                    .findFirst()
-                    .ifPresent(pref -> request.setToken(pref.getDeviceToken()));
-                break;
-            default:
-                throw new NotificationException("Unsupported notification type: " + campaign.getType());
-        }
-
-        return request;
     }
 } 

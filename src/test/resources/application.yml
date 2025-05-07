@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notification_service_test
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: com.example.notificationservice.config.TenantPhysicalNamingStrategy
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        multiTenancy: SCHEMA
+
+multi-tenant:
+  strategy: SCHEMA
+  default-tenant: public 

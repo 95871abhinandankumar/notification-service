@@ -1,0 +1,68 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notification_service_test
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      auto-commit: false
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: create-drop
+    naming:
+      implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+      physical-strategy: org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        hbm2ddl:
+          auto: create-drop
+        connection:
+          provider_disables_autocommit: false
+          handling_mode: DELAYED_ACQUISITION_AND_RELEASE
+          release_mode: AFTER_TRANSACTION
+        jdbc:
+          batch_size: 50
+          fetch_size: 50
+          time_zone: UTC
+        current_session_context_class: thread
+        transaction:
+          flush_before_completion: true
+          auto_close_session: true
+        multiTenancy: SCHEMA
+        multi_tenant_connection_provider: com.example.notificationservice.config.TenantConnectionProvider
+        tenant_identifier_resolver: com.example.notificationservice.config.TenantIdentifierResolver
+        default_schema: public
+
+  transaction:
+    rollback-on-commit-failure: true
+
+  sql:
+    init:
+      mode: always
+      schema-locations: 
+        - classpath:db/public-schema.sql
+      continue-on-error: true
+      separator: ;
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.example.notificationservice: DEBUG
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    org.springframework.jdbc.core: TRACE 
