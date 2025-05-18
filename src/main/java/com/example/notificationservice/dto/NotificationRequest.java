@@ -1,7 +1,8 @@
-package com.example.notificationservice.model;
+package com.example.notificationservice.dto;
 
 import lombok.Data;
 import jakarta.validation.constraints.NotNull;
+import com.example.notificationservice.model.NotificationType;
 
 import java.util.Map;
 

@@ -12,7 +12,7 @@ public interface TenantService {
     Tenant createTenant(TenantDTO tenantDTO);
     Optional<Tenant> getTenantById(Long id);
     Optional<Tenant> getTenantByIdentifier(String tenantIdentifier);
-    List<Tenant> getAllTenants();
+    List<TenantOnboardingResponse> getAllTenants();
     Tenant updateTenant(Long id, TenantDTO tenantDTO);
     void deleteTenant(Long id);
     void activateTenant(Long id);
@@ -23,4 +23,5 @@ public interface TenantService {
     void deactivateTenant(String tenantIdentifier);
     boolean verifySchemaExists(String schemaName);
     boolean verifyTenantExists(String tenantIdentifier);
+    void recreateTenantSchema(String tenantIdentifier);
 } 

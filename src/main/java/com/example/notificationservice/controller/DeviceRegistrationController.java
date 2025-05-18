@@ -47,9 +47,9 @@ public class DeviceRegistrationController {
                 .orElseThrow(() -> new NotificationException("User not found")));
             
             NotificationPreference preference = new NotificationPreference();
-            preference.setType(NotificationType.PUSH);
-            preference.setEnabled(true);
-            preference.setDeviceToken(device.getDeviceToken());
+            preference.setEmailEnabled(false);
+            preference.setSmsEnabled(false);
+            preference.setPushEnabled(true);
             userService.updateNotificationPreference(userId, preference);
             
             return ResponseEntity.ok(new NotificationResponse(true, "Device registered successfully"));
@@ -80,9 +80,9 @@ public class DeviceRegistrationController {
                 .orElseThrow(() -> new NotificationException("User not found")));
             
             NotificationPreference preference = new NotificationPreference();
-            preference.setType(NotificationType.PUSH);
-            preference.setEnabled(true);
-            preference.setDeviceToken(device.getDeviceToken());
+            preference.setEmailEnabled(false);
+            preference.setSmsEnabled(false);
+            preference.setPushEnabled(true);
             userService.updateNotificationPreference(userId, preference);
             
             return ResponseEntity.ok(new NotificationResponse(true, "Device updated successfully"));

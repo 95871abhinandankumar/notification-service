@@ -2,6 +2,7 @@ package com.example.notificationservice.controller;
 
 import com.example.notificationservice.model.NotificationType;
 import com.example.notificationservice.model.NotificationPreference;
+import com.example.notificationservice.model.User;
 import com.example.notificationservice.service.UserService;
 import com.example.notificationservice.dto.NotificationResponse;
 import com.example.notificationservice.exception.NotificationException;
@@ -27,6 +28,31 @@ public class UserNotificationPreferenceController {
     
     @Autowired
     private UserService userService;
+
+    @Operation(summary = "Get notification preferences for a user")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Notification preferences retrieved successfully"),
+        @ApiResponse(responseCode = "404", description = "User not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @GetMapping
+    public ResponseEntity<NotificationPreference> getNotificationPreferences(
+            @Parameter(description = "User ID", required = true) @PathVariable Long userId) {
+        try {
+            logger.info("Getting notification preferences for user {}", userId);
+            User user = userService.getUserById(userId)
+                .orElseThrow(() -> new NotificationException("User not found"));
+            
+            NotificationPreference preference = user.getNotificationPreferences().stream()
+                .findFirst()
+                .orElseThrow(() -> new NotificationException("No notification preferences found"));
+            
+            return ResponseEntity.ok(preference);
+        } catch (NotificationException e) {
+            logger.error("Failed to get notification preferences: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
     @Operation(summary = "Enable or disable a specific notification type for a user")
     @ApiResponses(value = {
@@ -65,7 +91,8 @@ public class UserNotificationPreferenceController {
             @Parameter(description = "Notification preference details", required = true) 
             @Valid @RequestBody NotificationPreference preference) {
         try {
-            logger.info("Adding notification preference for user {}: type={}", userId, preference.getType());
+            logger.info("Adding notification preference for user {}: email={}, sms={}, push={}", 
+                userId, preference.isEmailEnabled(), preference.isSmsEnabled(), preference.isPushEnabled());
             userService.updateNotificationPreference(userId, preference);
             return ResponseEntity.ok(new NotificationResponse(true, "Notification preference added successfully"));
         } catch (NotificationException e) {

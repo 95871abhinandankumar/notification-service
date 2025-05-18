@@ -1,96 +1,165 @@
 package com.example.notificationservice.service.impl;
 
-import com.example.notificationservice.dto.NotificationResponse;
-import com.example.notificationservice.model.NotificationRequest;
+import com.example.notificationservice.dto.NotificationRequest;
+import com.example.notificationservice.exception.NotificationException;
+import com.example.notificationservice.model.NotificationCampaign;
+import com.example.notificationservice.model.NotificationHistory;
+import com.example.notificationservice.model.NotificationTemplate;
 import com.example.notificationservice.model.NotificationType;
+import com.example.notificationservice.repository.NotificationCampaignRepository;
+import com.example.notificationservice.repository.NotificationHistoryRepository;
+import com.example.notificationservice.repository.NotificationTemplateRepository;
 import com.example.notificationservice.service.EmailService;
 import com.example.notificationservice.service.FCMService;
 import com.example.notificationservice.service.NotificationService;
 import com.example.notificationservice.service.SMSService;
-import com.example.notificationservice.model.*;
-import com.example.notificationservice.repository.NotificationTemplateRepository;
-import com.example.notificationservice.exception.NotificationException;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 /**
  * Implementation of the NotificationService interface
  */
-@Slf4j
 @Service
 public class NotificationServiceImpl implements NotificationService {
-    private final EmailService emailService;
-    private final SMSService smsService;
-    private final FCMService fcmService;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-    private final NotificationTemplateRepository templateRepository;
+    private static final Logger logger = LoggerFactory.getLogger(NotificationServiceImpl.class);
 
     @Autowired
-    public NotificationServiceImpl(
-            EmailService emailService,
-            SMSService smsService,
-            FCMService fcmService,
-            KafkaTemplate<String, Object> kafkaTemplate,
-            NotificationTemplateRepository templateRepository) {
-        this.emailService = emailService;
-        this.smsService = smsService;
-        this.fcmService = fcmService;
-        this.kafkaTemplate = kafkaTemplate;
-        this.templateRepository = templateRepository;
-    }
+    private EmailService emailService;
+
+    @Autowired
+    private SMSService smsService;
+
+    @Autowired
+    private FCMService fcmService;
+
+    @Autowired
+    private NotificationTemplateRepository templateRepository;
+
+    @Autowired
+    private NotificationCampaignRepository campaignRepository;
+
+    @Autowired
+    private NotificationHistoryRepository historyRepository;
 
     @Override
-    @Retryable(
-        value = {NotificationException.class},
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2)
-    )
-    public void sendNotification(@Valid NotificationRequest request) {
-        validateRequest(request);
+    public void sendNotification(NotificationRequest request) {
         try {
-            NotificationType type = request.getType();
-            switch (type) {
+            switch (request.getType()) {
                 case EMAIL:
-                    sendEmailNotification(request);
+                    emailService.sendEmail(request.getRecipient(), request.getSubject(), request.getContent());
                     break;
                 case SMS:
-                    sendSMSNotification(request);
+                    smsService.sendSMS(request.getRecipient(), request.getContent());
                     break;
                 case PUSH:
-                    sendPushNotification(request);
+                    fcmService.sendPushNotification(request.getRecipient(), request.getTitle(), request.getContent());
                     break;
                 default:
-                    throw new NotificationException("Unsupported notification type: " + type);
+                    throw new NotificationException("Unsupported notification type: " + request.getType());
             }
+            // Record notification history
+            saveNotificationHistory(request, true, null);
         } catch (Exception e) {
-            log.error("Failed to send notification: {}", e.getMessage(), e);
-            throw new NotificationException("Failed to send notification: " + e.getMessage(), e);
+            logger.error("Failed to send notification: {}", e.getMessage(), e);
+            saveNotificationHistory(request, false, e.getMessage());
+            throw new NotificationException("Failed to send notification", e);
         }
     }
 
     @Override
-    public void sendNotificationAsync(@Valid NotificationRequest request) {
-        validateRequest(request);
+    public void sendNotificationAsync(NotificationRequest request) {
+        // TODO: Implement async notification sending using a message queue
+        throw new UnsupportedOperationException("Async notification sending not implemented yet");
+    }
+
+    @Override
+    @Transactional
+    public void processCampaign(NotificationCampaign campaign) {
         try {
-            kafkaTemplate.send("notifications", request);
-            log.info("Notification queued successfully for recipient: {}", request.getRecipient());
+            campaign.setStatus(NotificationCampaign.CampaignStatus.IN_PROGRESS);
+            campaignRepository.save(campaign);
+
+            // TODO: Implement campaign processing logic
+            // This would typically involve:
+            // 1. Getting target users
+            // 2. Creating notification requests for each user
+            // 3. Sending notifications
+            // 4. Updating campaign status
+
+            campaign.setStatus(NotificationCampaign.CampaignStatus.COMPLETED);
+            campaignRepository.save(campaign);
         } catch (Exception e) {
-            log.error("Failed to queue notification: {}", e.getMessage(), e);
-            throw new NotificationException("Failed to queue notification", e);
+            logger.error("Failed to process campaign: {}", e.getMessage(), e);
+            campaign.setStatus(NotificationCampaign.CampaignStatus.FAILED);
+            campaignRepository.save(campaign);
+            throw new NotificationException("Failed to process campaign", e);
         }
     }
 
     @Override
-    public void processCampaign(@Valid NotificationCampaign campaign) {
-        // Implementation for campaign processing
+    public Optional<NotificationCampaign> getCampaignById(Long id) {
+        return campaignRepository.findById(id);
+    }
+
+    @Override
+    public List<NotificationCampaign> getAllCampaigns() {
+        return campaignRepository.findAll();
+    }
+
+    @Override
+    @Transactional
+    public void updateCampaignStatus(Long id, NotificationCampaign.CampaignStatus status) {
+        NotificationCampaign campaign = campaignRepository.findById(id)
+            .orElseThrow(() -> new NotificationException("Campaign not found with id: " + id));
+        campaign.setStatus(status);
+        campaignRepository.save(campaign);
+    }
+
+    @Override
+    public List<NotificationHistory> getHistoryByUser(String userId, LocalDateTime startDate, LocalDateTime endDate, NotificationType type) {
+        if (startDate != null && endDate != null) {
+            if (type != null) {
+                return historyRepository.findByUserIdAndCreatedAtBetweenAndType(userId, startDate, endDate, type);
+            }
+            return historyRepository.findByUserIdAndCreatedAtBetween(userId, startDate, endDate);
+        } else if (type != null) {
+            return historyRepository.findByUserIdAndType(userId, type);
+        }
+        return historyRepository.findByUserId(userId);
+    }
+
+    @Override
+    public List<NotificationHistory> getHistoryByCampaign(String campaignId) {
+        return historyRepository.findByCampaignId(campaignId);
+    }
+
+    @Override
+    public List<NotificationHistory> getHistoryByStatus(NotificationHistory.NotificationStatus status) {
+        return historyRepository.findByStatus(status);
+    }
+
+    private void saveNotificationHistory(NotificationRequest request, boolean success, String errorMessage) {
+        NotificationHistory history = new NotificationHistory();
+        history.setUserId(request.getRecipient());
+        history.setType(request.getType());
+        history.setContent(request.getContent());
+        history.setStatus(success ? NotificationHistory.NotificationStatus.SENT : NotificationHistory.NotificationStatus.FAILED);
+        history.setErrorMessage(errorMessage);
+        history.setCreatedAt(LocalDateTime.now());
+        historyRepository.save(history);
+    }
+
+    @Override
+    public NotificationTemplate createTemplate(@Valid NotificationTemplate template) {
+        return templateRepository.save(template);
     }
 
     @Override
@@ -105,6 +174,9 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public NotificationTemplate updateTemplate(NotificationTemplate template) {
+        if (!templateRepository.existsById(template.getId())) {
+            throw new NotificationException("Template not found with id: " + template.getId());
+        }
         return templateRepository.save(template);
     }
 
@@ -116,69 +188,5 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public List<NotificationTemplate> getAllTemplates() {
         return templateRepository.findAll();
-    }
-
-    @Override
-    public NotificationTemplate createTemplate(NotificationTemplate template) {
-        return templateRepository.save(template);
-    }
-
-    private void validateRequest(NotificationRequest request) {
-        if (request == null) {
-            throw new NotificationException("Notification request cannot be null");
-        }
-        if (request.getType() == null) {
-            throw new NotificationException("Notification type cannot be null");
-        }
-        if (!StringUtils.hasText(request.getRecipient())) {
-            throw new NotificationException("Recipient cannot be empty");
-        }
-        NotificationType type = request.getType();
-        if (type == NotificationType.PUSH && !StringUtils.hasText(request.getToken())) {
-            throw new NotificationException("Device token is required for push notifications");
-        }
-    }
-
-    private void sendEmailNotification(NotificationRequest request) {
-        try {
-            emailService.sendEmail(
-                request.getRecipient(),
-                request.getSubject(),
-                request.getContent()
-            );
-            log.info("Email sent successfully to {}", request.getRecipient());
-        } catch (Exception e) {
-            log.error("Failed to send email to {}", request.getRecipient(), e);
-            throw new NotificationException("Failed to send email: " + e.getMessage(), e);
-        }
-    }
-
-    private void sendSMSNotification(NotificationRequest request) {
-        try {
-            smsService.sendSMS(
-                request.getRecipient(),
-                request.getContent()
-            );
-            log.info("SMS sent successfully to {}", request.getRecipient());
-        } catch (Exception e) {
-            log.error("Failed to send SMS to {}", request.getRecipient(), e);
-            throw new NotificationException("Failed to send SMS: " + e.getMessage(), e);
-        }
-    }
-
-    private void sendPushNotification(NotificationRequest request) {
-        try {
-            if (request.getToken() != null) {
-                fcmService.sendMessageToToken(request);
-            } else if (request.getTopic() != null) {
-                throw new NotificationException("Topic-based notifications are not supported yet");
-            } else {
-                throw new NotificationException("Either token or topic must be provided for push notifications");
-            }
-            log.info("Push notification sent successfully to {}", request.getToken());
-        } catch (Exception e) {
-            log.error("Failed to send push notification", e);
-            throw new NotificationException("Failed to send push notification: " + e.getMessage(), e);
-        }
     }
 } 

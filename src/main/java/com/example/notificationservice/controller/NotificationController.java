@@ -1,8 +1,8 @@
 package com.example.notificationservice.controller;
 
-import com.example.notificationservice.model.NotificationRequest;
 import com.example.notificationservice.model.NotificationCampaign;
 import com.example.notificationservice.service.NotificationService;
+import com.example.notificationservice.dto.NotificationRequest;
 import com.example.notificationservice.dto.NotificationResponse;
 import com.example.notificationservice.exception.NotificationException;
 import io.swagger.v3.oas.annotations.Operation;

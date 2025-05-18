@@ -1,8 +1,9 @@
 package com.example.notificationservice.service.impl;
 
-import com.example.notificationservice.model.NotificationRequest;
+import com.example.notificationservice.dto.NotificationRequest;
 import com.example.notificationservice.exception.NotificationException;
 import com.example.notificationservice.service.FCMService;
+import com.example.notificationservice.model.NotificationType;
 import com.google.firebase.messaging.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -18,6 +19,16 @@ import java.util.concurrent.ExecutionException;
 @Service
 public class FCMServiceImpl implements FCMService {
     private static final Logger logger = LoggerFactory.getLogger(FCMServiceImpl.class);
+
+    @Override
+    public void sendPushNotification(String recipient, String title, String content) {
+        NotificationRequest request = new NotificationRequest();
+        request.setRecipient(recipient);
+        request.setTitle(title);
+        request.setBody(content);
+        request.setType(NotificationType.PUSH);
+        sendMessageToToken(request);
+    }
 
     @Override
     public void sendMessageToToken(NotificationRequest request) {

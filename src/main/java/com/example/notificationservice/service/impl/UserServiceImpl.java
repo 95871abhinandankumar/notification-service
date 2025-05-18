@@ -92,8 +92,22 @@ public class UserServiceImpl implements UserService {
             User user = getUserById(userId)
                 .orElseThrow(() -> new NotificationException("User not found"));
             
-            preference.setUser(user);
-            user.getNotificationPreferences().add(preference);
+            // Find existing preference or create new one
+            NotificationPreference existingPreference = user.getNotificationPreferences().stream()
+                .findFirst()
+                .orElse(new NotificationPreference());
+            
+            // Update the preference values
+            existingPreference.setEmailEnabled(preference.isEmailEnabled());
+            existingPreference.setSmsEnabled(preference.isSmsEnabled());
+            existingPreference.setPushEnabled(preference.isPushEnabled());
+            existingPreference.setUser(user);
+            
+            // If it's a new preference, add it to the list
+            if (existingPreference.getId() == null) {
+                user.getNotificationPreferences().add(existingPreference);
+            }
+            
             userRepository.save(user);
         } catch (Exception e) {
             logger.error("Failed to update notification preference: {}", e.getMessage(), e);
@@ -107,15 +121,20 @@ public class UserServiceImpl implements UserService {
             User user = getUserById(userId)
                 .orElseThrow(() -> new NotificationException("User not found"));
             
-            user.getNotificationPreferences().stream()
-                .filter(pref -> pref.getType() == type)
+            NotificationPreference preference = user.getNotificationPreferences().stream()
                 .findFirst()
-                .ifPresent(pref -> {
-                    pref.setEnabled(enabled);
-                    if (deviceToken != null) {
-                        pref.setDeviceToken(deviceToken);
+                .orElse(new NotificationPreference());
+            
+            switch (type) {
+                case EMAIL -> preference.setEmailEnabled(enabled);
+                case SMS -> preference.setSmsEnabled(enabled);
+                case PUSH -> preference.setPushEnabled(enabled);
+            }
+            
+            preference.setUser(user);
+            if (preference.getId() == null) {
+                user.getNotificationPreferences().add(preference);
                     }
-                });
             
             userRepository.save(user);
         } catch (Exception e) {
@@ -130,7 +149,21 @@ public class UserServiceImpl implements UserService {
             User user = getUserById(userId)
                 .orElseThrow(() -> new NotificationException("User not found"));
             
-            user.getNotificationPreferences().removeIf(pref -> pref.getType() == type);
+            NotificationPreference preference = user.getNotificationPreferences().stream()
+                .findFirst()
+                .orElse(new NotificationPreference());
+            
+            switch (type) {
+                case EMAIL -> preference.setEmailEnabled(false);
+                case SMS -> preference.setSmsEnabled(false);
+                case PUSH -> preference.setPushEnabled(false);
+            }
+            
+            preference.setUser(user);
+            if (preference.getId() == null) {
+                user.getNotificationPreferences().add(preference);
+            }
+            
             userRepository.save(user);
         } catch (Exception e) {
             logger.error("Failed to remove notification preference: {}", e.getMessage(), e);

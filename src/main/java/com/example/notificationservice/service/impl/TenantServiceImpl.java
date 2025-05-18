@@ -195,8 +195,19 @@ public class TenantServiceImpl implements TenantService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Tenant> getAllTenants() {
-        return tenantRepository.findAll();
+    public List<TenantOnboardingResponse> getAllTenants() {
+        List<Tenant> tenants = tenantRepository.findAll();
+        return tenants.stream()
+            .map(tenant -> {
+                TenantOnboardingResponse response = new TenantOnboardingResponse();
+                response.setTenantIdentifier(tenant.getTenantIdentifier());
+                response.setName(tenant.getName());
+                response.setSchemaName(tenant.getSchemaName());
+                response.setStatus(tenant.isActive() ? "ACTIVE" : "INACTIVE");
+                response.setCreatedAt(tenant.getCreatedAt());
+                return response;
+            })
+            .collect(Collectors.toList());
     }
 
     @Override
@@ -278,5 +289,29 @@ public class TenantServiceImpl implements TenantService {
     @Transactional(readOnly = true)
     public boolean verifyTenantExists(String tenantIdentifier) {
         return tenantRepository.findByTenantIdentifier(tenantIdentifier).isPresent();
+    }
+
+    @Override
+    @Transactional
+    public void recreateTenantSchema(String tenantIdentifier) {
+        log.info("Recreating schema for tenant: {}", tenantIdentifier);
+        
+        Tenant tenant = tenantRepository.findByTenantIdentifier(tenantIdentifier)
+                .orElseThrow(() -> new EntityNotFoundException("Tenant not found with identifier: " + tenantIdentifier));
+        
+        String schemaName = tenant.getSchemaName();
+        
+        try {
+            // Drop existing schema
+            entityManager.createNativeQuery("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE").executeUpdate();
+            
+            // Create and initialize new schema
+            createAndInitializeSchema(schemaName);
+            
+            log.info("Successfully recreated schema for tenant: {}", tenantIdentifier);
+        } catch (Exception e) {
+            log.error("Failed to recreate schema for tenant: {}", tenantIdentifier, e);
+            throw new RuntimeException("Failed to recreate tenant schema: " + e.getMessage(), e);
+        }
     }
 } 

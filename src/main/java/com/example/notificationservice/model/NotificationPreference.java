@@ -16,27 +16,20 @@ public class NotificationPreference {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
-    private NotificationType type;
+    @Column(name = "email_enabled", nullable = false)
+    private boolean emailEnabled = true;
 
-    @Column(name = "device_token")
-    private String deviceToken;
+    @Column(name = "sms_enabled", nullable = false)
+    private boolean smsEnabled = true;
 
-    @Column(name = "is_enabled")
-    private boolean isEnabled = true;
+    @Column(name = "push_enabled", nullable = false)
+    private boolean pushEnabled = true;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
-    @Column(name = "created_by")
-    private String createdBy;
-
-    @Column(name = "updated_by")
-    private String updatedBy;
 
     @PrePersist
     protected void onCreate() {

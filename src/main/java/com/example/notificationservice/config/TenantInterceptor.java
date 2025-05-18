@@ -15,6 +15,12 @@ public class TenantInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // Skip tenant header check for tenant management endpoints
+        if (request.getRequestURI().startsWith("/api/v1/tenants")) {
+            logger.debug("Skipping tenant header check for tenant management endpoint: {}", request.getRequestURI());
+            return true;
+        }
+
         String tenantId = request.getHeader(TENANT_HEADER);
         if (tenantId == null || tenantId.isEmpty()) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);

@@ -10,4 +10,4 @@ import lombok.AllArgsConstructor;
 public class NotificationResponse {
     private boolean success;
     private String message;
-}
+} 

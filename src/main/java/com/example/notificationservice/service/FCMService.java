@@ -1,6 +1,6 @@
 package com.example.notificationservice.service;
 
-import com.example.notificationservice.model.NotificationRequest;
+import com.example.notificationservice.dto.NotificationRequest;
 import com.example.notificationservice.exception.NotificationException;
 
 /**
@@ -13,4 +13,6 @@ public interface FCMService {
      * @throws NotificationException if sending fails
      */
     void sendMessageToToken(NotificationRequest request);
+
+    void sendPushNotification(String recipient, String title, String content);
 }
